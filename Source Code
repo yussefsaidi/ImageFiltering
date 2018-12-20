@@ -1,0 +1,180 @@
+/*
+Image fitering and smoothing
+
+Uses:
+- median of medians & quick select algorithm
+- opencv2
+-
+*/
+
+
+#include "stdafx.h"
+#include<iostream>
+#include<iterator>			//for vectors
+#include<algorithm>			//for random numbers
+#include<vector>			
+#include <stdlib.h>			//for 
+#include <chrono>			//for clock
+#include<opencv2/imgproc/imgproc.hpp>
+#include<opencv2/highgui/highgui.hpp>
+
+
+using namespace std;
+using namespace cv;
+using namespace std::chrono;
+
+
+//////////////////////////
+// Prints out the vector
+//////////////////////////
+void print(vector<int> & v) {
+	cout << endl;
+	for (int i = 0; i < v.size(); i++) {
+		cout << v[i] << " ";
+	}
+}
+
+
+//////////////////////////
+// Swapping two elements 
+//////////////////////////
+void swap(int* a, int* b) {
+	int t = *a;
+	*a = *b;
+	*b = t;
+}
+
+/////////////////////////////////////////////
+//Function to partition smaller numbers to 
+//left of pivot (median), and bigger numbers 
+//to right of it (quick sort)
+/////////////////////////////////////////////
+int pivot(vector<int>& vec, int median, int start, int end) {
+	int left = start;
+	int right = end - 1;
+	int temp;
+
+	while (left < right) {
+		while (vec.at(left) < median && left <= right)
+			left++;
+		while (vec.at(right) > median && right >= left)
+			right--;
+
+		if (left > right)
+			break;
+		else if
+			(vec.at(left) == vec.at(right)) {
+			left++; continue;
+		}
+
+		//Swap
+		temp = vec.at(left);
+		vec.at(left) = vec.at(right);
+		vec.at(right) = temp;
+	}
+	return right;
+}
+
+
+////////////////////////////////////////////
+// Finding kth value
+////////////////////////////////////////////
+int MoM(vector<int> & vec, int start, int end, int k) {
+
+	if (end - start < 9) {			//base case when we have less than 6 numbers
+		sort(vec.begin() + start, vec.begin() + end);
+		return vec.at(k);
+	}
+
+	vector<int> medians;
+	for (int i = start; i < end; i += 5) {
+		if (end - i < 9) {			//base case
+			sort(vec.begin() + i, vec.begin() + end);
+			medians.push_back(vec.at((i + end) / 2));
+		}
+
+		else {
+			sort(vec.begin() + i, vec.begin() + i + 5);
+			medians.push_back(vec.at(i + 2));
+		}
+	}
+
+	int median = MoM(medians, 0, medians.size(), medians.size() / 2); //Recurse to keep splitting in 5 and getting the median
+
+	int piv = pivot(vec, median, start, end);
+	int length = piv - start + 1;
+	if (k < length)
+		return MoM(vec, start, piv, k);
+	else if (k > length)
+		return MoM(vec, piv + 1, end, k - length);
+	else
+		return vec[k];
+
+}
+
+
+int main() {
+
+	Mat src, dst;
+	int n;
+	int modifiedX = 0;
+	int modifiedY = 0;
+	int median = 0;
+
+	//Load an image
+	src = imread("initial_20.png", IMREAD_GRAYSCALE);
+	cout << "Enter your chosen window size: ";
+	cin >> n;
+	int windowSize = n * n;
+
+	if (!src.data) {
+		return -1;
+	}
+
+	//Container of size n*n
+	vector<int> windows(windowSize);
+
+	//Creates copy of image
+	//Initializes all points to (0,0) in copy
+	dst = src.clone();
+	for (int y = 0; y < src.rows; y++)
+		for (int x = 0; x < src.cols; x++)
+			dst.at<uchar>(y, x) = 0.0;
+
+
+	for (int y = 0; y < src.rows - n + 1; y++) {		//Traverses all rows , moves one row down 
+		for (int x = 0; x < src.cols - n + 1; x++) {	//Traverses all columns, moves one column to the right
+			for (int i = 0; i < windowSize; i++) {		//Traverses & stores values of whole window of size n*n
+
+				modifiedX = x + i % n;
+				modifiedY = y + i / n;
+				windows[i] = src.at<uchar>(modifiedY, modifiedX);
+			}
+
+			//Returns the nth/2 value, which is the median
+			median = MoM(windows, 0, windows.size(), (windowSize) / 2);
+
+			//Assign the median to center element of the matrix
+			dst.at<uchar>(y + n / 2, x + n / 2) = median;
+		}
+	}
+
+	//Prints out initial image
+	namedWindow("initial");
+	imshow("initial", src);
+
+	//Prints out final image
+	namedWindow("final");
+	imshow("final", dst);
+
+	//Used to create file with final image
+	vector<int> compressionParams;
+	compressionParams.push_back(IMWRITE_PNG_COMPRESSION);
+	compressionParams.push_back(9);
+	imwrite("final_20 - 5x5.png", dst, compressionParams);
+
+	waitKey();
+	return 0;
+}
+
+///////////////////////////////////////
